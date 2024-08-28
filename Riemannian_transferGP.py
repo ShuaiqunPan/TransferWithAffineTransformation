@@ -34,6 +34,7 @@ import json
 import gc
 import csv
 
+
 def main(problem_selection):
     '''
     The main program to run the 24 BBOB functions simultansoulsy under each dimension.
@@ -51,7 +52,7 @@ def main(problem_selection):
     number_of_data_TL_test = 1000 * dimension
     
     # Specify the path of the Result folder
-    result_path = 'Result1'
+    result_path = 'Result'
     os.makedirs(result_path, exist_ok=True)
 
     # We save the experimental results in the log files for further analysis.

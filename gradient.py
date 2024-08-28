@@ -25,7 +25,7 @@ def cost_function(x, y, weight, translation, m):
     mean, variance = m.predict(x_affine)
     diff = mean - y
     differences_squared = diff ** 2
-    mean_diff = np.sum(differences_squared) / (2 * n_T)
+    mean_diff = np.sum(differences_squared) / 2
     return mean_diff
 
 def manifold_gradient_cost_function_with_penalties(x, y, weight, translation, mean, derivative_mean, dimension):
@@ -41,10 +41,8 @@ def manifold_gradient_cost_function_with_penalties(x, y, weight, translation, me
     start_time = time.process_time()  # Start timing for CPU time
     for k in range(n_T):
         weight_derivative += diff[k] * np.outer(derivative_mean[k], x[k])
-    weight_derivative /= n_T
 
     translation_derivative = np.dot(diff.T, derivative_mean)
-    translation_derivative /= n_T
 
     gradient_calculation_time = time.process_time() - start_time  # CPU time for the total Gradient Calculation
                 
@@ -90,7 +88,7 @@ def iterate_minibatches(inputs, targets, batchsize, j, shuffle=False):
         else:
             excerpt = slice(start_idx, end_idx)
         yield inputs[excerpt], targets[excerpt]
- 
+
 def Riemannian_gradient_descent(R, beta, dimension, X_TL_training, Y_TL_training, m, stopping_epoch_threshold, k, 
                                 scheduler_type, epochs, batch_size, alpha, decay_rate):
     '''
@@ -163,7 +161,7 @@ def Riemannian_gradient_descent(R, beta, dimension, X_TL_training, Y_TL_training
         # Check the stopping condition for small cost change
         if previous_cost and np.isclose(previous_cost, current_cost):
             restart_points.append(j)
-            print(f"Restarting with a new rotation matrix but the same translation matrix due to small cost change: {previous_cost} to {current_cost}")
+            print(f"Restarting with a new rotation matrix and a new translation matrix due to small cost change: {previous_cost} to {current_cost}")
             theta, scheduler = initialize(epoch=j)  # Pass current epoch to vary random state
             previous_cost = None  # Reset the previous cost
             continue
@@ -210,13 +208,11 @@ class AutoML():
         # Build the configuration space with all parameters.
         cs = ConfigurationSpace(seed = seed)
 
-        # Create the hyperparameters with their range
-        lr = Float("lr", (1e-7, 1e-1), default=0.001, log=True)
-        batch_size = Integer("batch_size", (math.ceil(self.batch_size/2), self.batch_size), default=self.batch_size)
-        decay_rate = Float("decay_rate", (0, 1), default=0.1)
+        lr = Float("lr", (1e-3, 1), default=0.001, log=True)
+        decay_rate = Float("decay_rate", (5e-3, 0.3), default=0.1)
 
         # Add hyperparameters to the configspace
-        cs.add_hyperparameters([lr, batch_size, decay_rate])
+        cs.add_hyperparameters([lr, decay_rate])
 
         return cs
 
@@ -225,7 +221,7 @@ class AutoML():
 
         final_cost, final_rotation_matrix, final_translation_matrix, adam_history, rotation_history, translation_history, gradient_rotation_history, alpha_history, projection_gradient_rotation_history, restart_points, total_cpu_time = Riemannian_gradient_descent(self.R, self.beta,
             self.dimension, self.X_TL_training, self.Y_TL_training, self.m, self.stopping_epoch_threshold, self.k, self.scheduler_type, self.epochs, 
-            batch_size=config_dict['batch_size'], alpha=config_dict['lr'], decay_rate=config_dict['decay_rate'])
+            self.batch_size, alpha=config_dict['lr'], decay_rate=config_dict['decay_rate'])
         
         x_affine_test = (final_rotation_matrix @ self.X_TL_test.T).T + final_translation_matrix
         mean_TL, variance_TL = self.m.predict(x_affine_test)
@@ -248,10 +244,9 @@ def AutoML_Riemannian_gradient_descent(R, beta, dimension, X_TL_training, Y_TL_t
     
     print("Incumbent lr :", incumbent["lr"])
     print("Incumbent decay_rate :", incumbent["decay_rate"])
-    print("Incumbent batch_size :", incumbent["batch_size"])
     
     final_cost, final_rotation_matrix, final_translation_matrix, adam_history, rotation_history, translation_history, gradient_rotation_history, alpha_history, projection_gradient_rotation_history, restart_points, total_cpu_time = Riemannian_gradient_descent(R, beta, 
-            dimension, X_TL_training, Y_TL_training, m, stopping_epoch_threshold, k, scheduler_type, epochs, batch_size=incumbent["batch_size"],
+            dimension, X_TL_training, Y_TL_training, m, stopping_epoch_threshold, k, scheduler_type, epochs, batch_size,
             alpha=incumbent["lr"], decay_rate=incumbent["decay_rate"])
     
     return final_cost, final_rotation_matrix, final_translation_matrix, adam_history, rotation_history, translation_history, gradient_rotation_history, alpha_history, projection_gradient_rotation_history, restart_points, total_cpu_time
